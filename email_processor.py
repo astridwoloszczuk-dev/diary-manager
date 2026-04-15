@@ -171,6 +171,7 @@ def mark_as_read(msg_id):
     _gmail().users().messages().modify(
         userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}
     ).execute()
+    print(f"Marked as read: {msg_id}")
 
 
 def process_email(msg_id):
