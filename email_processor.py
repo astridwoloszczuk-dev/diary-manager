@@ -115,6 +115,27 @@ def get_message_content(msg_id):
     }
 
 
+def build_rrule(recurrence):
+    """Convert a recurrence dict to a Google Calendar RRULE string."""
+    if not recurrence:
+        return None
+    freq = recurrence.get("frequency", "WEEKLY").upper()
+    parts = [f"FREQ={freq}"]
+    days = recurrence.get("days")
+    if days:
+        day_map = {"monday":"MO","tuesday":"TU","wednesday":"WE","thursday":"TH",
+                   "friday":"FR","saturday":"SA","sunday":"SU"}
+        byday = ",".join(day_map.get(d.lower(), d.upper()[:2]) for d in days)
+        parts.append(f"BYDAY={byday}")
+    until = recurrence.get("until")
+    if until:
+        parts.append(f"UNTIL={until.replace('-', '')}T235959Z")
+    count = recurrence.get("count")
+    if count and not until:
+        parts.append(f"COUNT={count}")
+    return "RRULE:" + ";".join(parts)
+
+
 def parse_request(subject, body):
     """Use Claude Haiku to parse a calendar request into structured JSON."""
     today = datetime.now()
@@ -126,8 +147,17 @@ Today is {today.strftime('%A, %d %B %Y')}.
 
 Request: {text}
 
-Return ONLY a JSON object. For adding an event:
-{{"action":"add","title":"event title","date":"YYYY-MM-DD","start_time":"HH:MM","end_time":"HH:MM","location":"location or null","attendees_raw":"names as written or null","description":"extra notes or null"}}
+Return ONLY a JSON object. For adding a one-time event:
+{{"action":"add","title":"event title","date":"YYYY-MM-DD","start_time":"HH:MM","end_time":"HH:MM","location":"location or null","attendees_raw":"names as written or null","description":"extra notes or null","recurrence":null}}
+
+For adding a recurring event, include a recurrence object:
+{{"action":"add","title":"event title","date":"YYYY-MM-DD","start_time":"HH:MM","end_time":"HH:MM","location":"location or null","attendees_raw":"names as written or null","description":"extra notes or null","recurrence":{{"frequency":"WEEKLY","days":["friday"],"until":"YYYY-MM-DD"}}}}
+
+Recurrence rules:
+- frequency: DAILY, WEEKLY, or MONTHLY
+- days: list of day names (only for WEEKLY), e.g. ["monday","wednesday"]
+- until: end date as YYYY-MM-DD (use this if a specific end date is given)
+- count: number of occurrences (use this only if no end date is given)
 
 For moving/rescheduling:
 {{"action":"move","search_term":"keyword to find event","date":"YYYY-MM-DD","start_time":"HH:MM","end_time":"HH:MM or null"}}
@@ -142,12 +172,13 @@ Rules:
 - "this friday" = the coming Friday, even if today is Friday
 - "next tuesday" = Tuesday of next week
 - If no end time, default to 1 hour after start
-- If no title given, infer one from context"""
+- If no title given, infer one from context
+- date = first occurrence date"""
 
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=500,
+        max_tokens=800,
         messages=[{"role": "user", "content": prompt}],
     )
     raw = response.content[0].text.strip()
@@ -193,6 +224,7 @@ def process_email(msg_id):
             datetime.strptime(parsed["start_time"], "%H:%M") + timedelta(hours=1)
         ).strftime("%H:%M")
         end = f"{parsed['date']}T{end_time}:00"
+        rrule = build_rrule(parsed.get("recurrence"))
 
         add_event(
             subject=parsed["title"],
@@ -201,11 +233,19 @@ def process_email(msg_id):
             location=parsed.get("location"),
             description=parsed.get("description"),
             attendees=attendees or None,
+            recurrence=rrule,
         )
 
         reply = f"Done!\n\n{parsed['title']}\n{parsed['date']}  {parsed['start_time']}–{end_time}"
         if parsed.get("location"):
             reply += f"\n{parsed['location']}"
+        if rrule:
+            rec = parsed["recurrence"]
+            until = rec.get("until", "")
+            days = ", ".join(rec.get("days", [])).title()
+            reply += f"\nRepeats weekly on {days}" if days else "\nRepeating event"
+            if until:
+                reply += f" until {until}"
         if attendees:
             reply += f"\nInvites sent to: {', '.join(attendees)}"
 

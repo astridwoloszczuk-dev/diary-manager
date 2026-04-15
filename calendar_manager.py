@@ -49,7 +49,7 @@ def find_events(search_term, days_ahead=30):
     return result.get("items", [])
 
 
-def add_event(subject, start, end, location=None, description=None, attendees=None, all_day=False):
+def add_event(subject, start, end, location=None, description=None, attendees=None, all_day=False, recurrence=None):
     """
     Add a calendar event.
     start/end: 'YYYY-MM-DDTHH:MM:SS' for timed events, 'YYYY-MM-DD' for all-day
@@ -73,6 +73,8 @@ def add_event(subject, start, end, location=None, description=None, attendees=No
         event["description"] = description
     if attendees:
         event["attendees"] = [{"email": a} for a in attendees]
+    if recurrence:
+        event["recurrence"] = [recurrence]
 
     created = _service().events().insert(calendarId=CALENDAR_ID, body=event).execute()
     print(f"Created: '{created['summary']}' — {created['start']}")
