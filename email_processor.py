@@ -98,7 +98,7 @@ def resolve_attendees(text):
     return list(dict.fromkeys(emails))  # deduplicate, preserve order
 
 
-SKIP_SUBJECT_PREFIXES = ("accepted:", "declined:", "tentative:", "cancelled:", "re:", "fwd:", "fw:")
+SKIP_SUBJECT_PREFIXES = ("accepted:", "declined:", "tentative:", "cancelled:")
 
 def get_unread_messages():
     svc = _gmail()
