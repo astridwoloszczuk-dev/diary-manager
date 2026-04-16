@@ -50,7 +50,13 @@ def resolve_attendees(text):
     emails = []
     text_lower = text.lower()
 
-    # Handle group aliases first
+    # Handle "all of us" / "everyone" / "whole family" aliases
+    for phrase in ("all 5 of us", "all of us", "us all", "everyone", "whole family", "all family"):
+        if phrase in text_lower:
+            emails.extend(CONTACTS["family"])
+            text_lower = text_lower.replace(phrase, "")
+
+    # Handle group aliases
     for key in ("family", "kids", "boys"):
         if key in text_lower:
             value = CONTACTS.get(key, [])
@@ -61,9 +67,21 @@ def resolve_attendees(text):
     if "niko private" in text_lower:
         emails.append(CONTACTS["niko_private"])
         text_lower = text_lower.replace("niko private", "")
-    elif "niko" in text_lower:
+    elif "niko" in text_lower or "nik" in text_lower:
         emails.append(CONTACTS["niko_work"])
-        text_lower = text_lower.replace("niko", "")
+        text_lower = text_lower.replace("niko", "").replace("nik", "")
+
+    # Parent aliases
+    for alias in ("mum", "mom", "mama", "mother"):
+        if alias in text_lower:
+            emails.append(CONTACTS["astrid"])
+            text_lower = text_lower.replace(alias, "")
+            break
+    for alias in ("dad", "papa", "father"):
+        if alias in text_lower:
+            emails.append(CONTACTS["niko_work"])
+            text_lower = text_lower.replace(alias, "")
+            break
 
     # Handle individual names
     for name in ("astrid", "me", "alex", "alexander", "victoria", "vicky", "maximilian", "max"):
@@ -71,6 +89,11 @@ def resolve_attendees(text):
             value = CONTACTS.get(name)
             if value and isinstance(value, str):
                 emails.append(value)
+
+    # Pick up any raw email addresses in the text
+    import re
+    raw_emails = re.findall(r"[\w.+\-]+@[\w.\-]+\.\w+", text)
+    emails.extend(raw_emails)
 
     return list(dict.fromkeys(emails))  # deduplicate, preserve order
 
