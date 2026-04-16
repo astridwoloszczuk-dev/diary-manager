@@ -81,7 +81,7 @@ def add_event(subject, start, end, location=None, description=None, attendees=No
     return created
 
 
-def update_event(event_id, subject=None, start=None, end=None, location=None, description=None, all_day=False):
+def update_event(event_id, subject=None, start=None, end=None, location=None, description=None, attendees=None, all_day=False):
     """Update fields on an existing event."""
     svc = _service()
     event = svc.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
@@ -101,6 +101,8 @@ def update_event(event_id, subject=None, start=None, end=None, location=None, de
         event["location"] = location
     if description:
         event["description"] = description
+    if attendees is not None:
+        event["attendees"] = [{"email": a} for a in attendees]
     updated = svc.events().update(calendarId=CALENDAR_ID, eventId=event_id, body=event).execute()
     print(f"Updated: '{updated['summary']}'")
     return updated

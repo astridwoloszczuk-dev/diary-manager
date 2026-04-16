@@ -188,6 +188,9 @@ For moving/rescheduling:
 For cancelling/deleting:
 {{"action":"delete","search_term":"keyword to find event"}}
 
+For updating an existing event (adding/changing attendees, location, title, or description):
+{{"action":"update","search_term":"keyword to find event","attendees_raw":"names or emails to add or null","location":"new location or null","title":"new title or null","description":"new description or null"}}
+
 If unclear:
 {{"action":"unclear","message":"what is unclear"}}
 
@@ -196,7 +199,8 @@ Rules:
 - "next tuesday" = Tuesday of next week
 - If no end time, default to 1 hour after start
 - If no title given, infer one from context
-- date = first occurrence date"""
+- date = first occurrence date
+- For update: only include fields that are actually being changed"""
 
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     response = client.messages.create(
@@ -301,6 +305,37 @@ def process_email(msg_id):
             event = events[0]
             delete_event(event["id"])
             reply = f"Done! Deleted '{event['summary']}'."
+
+    elif action == "update":
+        events = find_events(parsed["search_term"])
+        if not events:
+            reply = f"Couldn't find an upcoming event matching '{parsed['search_term']}'. No changes made."
+        else:
+            event = events[0]
+            changes = {}
+            reply_parts = [f"Done! Updated '{event['summary']}'."]
+
+            if parsed.get("title"):
+                changes["subject"] = parsed["title"]
+                reply_parts.append(f"Title → {parsed['title']}")
+
+            if parsed.get("location"):
+                changes["location"] = parsed["location"]
+                reply_parts.append(f"Location → {parsed['location']}")
+
+            if parsed.get("description"):
+                changes["description"] = parsed["description"]
+
+            new_attendees = resolve_attendees(parsed.get("attendees_raw", ""))
+            if new_attendees:
+                # Merge with existing attendees
+                existing = [a["email"] for a in event.get("attendees", [])]
+                merged = list(dict.fromkeys(existing + new_attendees))
+                changes["attendees"] = merged
+                reply_parts.append(f"Invites sent to: {', '.join(new_attendees)}")
+
+            update_event(event["id"], **changes)
+            reply = "\n".join(reply_parts)
 
     else:
         reply = (
