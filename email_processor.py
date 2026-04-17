@@ -25,8 +25,16 @@ with open(os.path.join(BASE_DIR, "contacts.json")) as f:
     CONTACTS = json.load(f)
 
 AUTHORIZED_SENDERS = {
+    # Astrid
     "astrid.woloszczuk@outlook.com",
     "astrid.woloszczuk@googlemail.com",
+    # Niko
+    "woloszczuk@stonepeak.com",
+    "nwoloszczuk@gmail.com",
+    # Kids
+    "alexander.woloszczuk@gmail.com",
+    "maximilian.woloszczuk@gmail.com",
+    "victoria.woloszczuk@gmail.com",
 }
 
 # Load API key from .env file
